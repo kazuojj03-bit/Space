@@ -1,0 +1,13 @@
+SpacePhone 3.1 public source preparation
+
+Source/BrowserClient.cs:
+  One historical absolute-machine-path test hook was replaced with a comment. The removed hook added --profile and --test-capture-dir arguments only when running in the original developer's exact local test-copy directory. Normal gameplay behaviour is unchanged by this source-only removal.
+
+Other Source and WebViewHost .cs / .csproj files are byte-identical to the verified 3.1 source package. Default GameRoot still points to the standard Steam Demo installation and can be overridden with -p:GameRoot when building.
+
+The verified production SpacePhone.dll has NOT been rebuilt or altered. Its SHA256 remains:
+a6835e5c4a5b932a8870621f4f4beba35560c29754f12e564240bea0a487b0f2
+
+The source archive also adds build instructions, source-file hash records, 21 project-generated PNG assets, and original third-party licence texts. It does not contain generated interop/game assemblies, NuGet caches, bin/obj, test plugins, debug symbols, save files, account profiles or users' music.
+
+Availability of this source package does not imply permission to relicense or republish it. Author permissions are retained; third-party dependencies have their own licences.

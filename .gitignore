@@ -1,0 +1,10 @@
+﻿**/bin/
+**/obj/
+**/test-artifacts/
+build-output/
+artifacts/
+*.exe
+*.dll
+*.pdb
+*.es3
+WebProfiles/

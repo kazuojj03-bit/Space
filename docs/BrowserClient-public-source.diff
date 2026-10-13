@@ -1,0 +1,11 @@
+﻿--- historical/BrowserClient.cs (private path redacted)
++++ public/plugin/BrowserClient.cs
+@@ -57,7 +57,7 @@
+         var sessionPipe=new NamedPipeServerStream(pipeName,PipeDirection.InOut,1,PipeTransmissionMode.Byte,PipeOptions.Asynchronous|PipeOptions.CurrentUserOnly);pipe=sessionPipe;
+         var start=new ProcessStartInfo(executable){UseShellExecute=false,CreateNoWindow=true,WindowStyle=ProcessWindowStyle.Hidden,WorkingDirectory=Path.GetDirectoryName(executable)!};
+         start.ArgumentList.Add("--pipe");start.ArgumentList.Add(pipeName);
+-        if(string.Equals(BepInEx.Paths.GameRootPath,@"<developer-local-test-copy-path>",StringComparison.OrdinalIgnoreCase)){start.ArgumentList.Add("--profile");start.ArgumentList.Add(Path.Combine(BepInEx.Paths.GameRootPath,"browser-test-profile"));start.ArgumentList.Add("--test-capture-dir");start.ArgumentList.Add(BepInEx.Paths.GameRootPath);}
++        // Public source: local clone-specific test profile/capture launch arguments omitted.
+         // Browser owns normal site sessions. No account/token/password is copied into game saves.
+         var sessionProcess=Process.Start(start)??throw new InvalidOperationException("无法启动网页组件");process=sessionProcess;running=true;
+         _=Task.Run(async()=>

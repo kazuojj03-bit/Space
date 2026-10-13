@@ -1,0 +1,13 @@
+{
+  "retrievedUtc": "2026-10-13T09:15:41.9850364Z",
+  "filename": "MicrosoftEdgeWebView2RuntimeInstallerX64.exe",
+  "downloadEntry": "https://go.microsoft.com/fwlink/?LinkId=2124701",
+  "finalDownload": "https://msedge.sf.dl.delivery.mp.microsoft.com/filestreamingservice/files/7c7c0e6f-8cb5-406a-8e51-df0c62011e55/MicrosoftEdgeWebView2RuntimeInstallerX64.exe",
+  "size": 214090448,
+  "sha256": "2a6add76c37bfa872eb8c2b22d45b3216b8e2a1f193e0774006340ff62ac5fa0",
+  "authenticodeStatus": "Valid",
+  "signer": "Microsoft Corporation",
+  "installerVersion": "1.3.275.13",
+  "systemInstalledByAudit": false,
+  "officialEula": "https://developer.microsoft.com/microsoft-edge/api/eula/webview2?locale=en-us"
+}
