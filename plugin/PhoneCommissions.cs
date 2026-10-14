@@ -11,7 +11,7 @@ public sealed partial class PhoneBehaviour
         changed|=CommissionRules.Settle(state.Commissions,Day);
         changed|=FlushCommissionRewards();
         if(changed)WriteState();
-        commissionClients.Tick(Store,state.Commissions,Day,OnCommissionChoice,WriteState,Close);
+        commissionClients.Tick(Store,state.Commissions,Day,OnCommissionChoice,WriteState,Close,pendingAction==null&&confirmAction==null&&!NativePhoneBusy());
     }
     [HideFromIl2Cpp] private void OpenCommissions(int index)
     {selectedCommission=index is >=0 and <3?index:-1;Navigate("实物委托");}
@@ -29,7 +29,7 @@ public sealed partial class PhoneBehaviour
         string token=$"{uid.Length}:{uid}:{itemId.Length}:{itemId}:{Day}:{units}:{amount}";
         var result=CommissionRules.RecordPayment(state.Commissions,index,Day,clientId,itemId,units,amount,token);
         if(!result.Changed)return;
-        FlushCommissionRewards();var entry=state.Commissions.Entries[index];message=entry.Status!=CommissionStatus.Completed?result.Message:entry.PendingResearch?"委托完成 · 1点资料待归档，研究消耗后自动领取":"委托完成 · 原版柜台已付款，1点研究资料已归档";WriteState();nextDraw=0;nextCargoScan=0;
+        FlushCommissionRewards();ObserveFollowup();var entry=state.Commissions.Entries[index];message=entry.Status!=CommissionStatus.Completed?result.Message:entry.PendingResearch?"委托完成 · 1点资料待归档，研究消耗后自动领取":"委托完成 · 原版柜台已付款，1点研究资料已归档";WriteState();nextDraw=0;nextCargoScan=0;
     }
     [HideFromIl2Cpp] private bool FlushCommissionRewards()
     {
@@ -42,6 +42,8 @@ public sealed partial class PhoneBehaviour
     [HideFromIl2Cpp] private void InviteCommission(int index,int stage)
     {
         if(state==null||index is <0 or >2||state.Stories.Threads[index].Phase<1){message="先在柜台认识这位伙伴，再谈实物委托";return;}
+        if(NightOrderHasPending()){message="夜班买家已有到访安排，先完成或取消它";return;}
+        if(LostCallHasPending()){message="余灯已有来店安排，先完成或取消它";return;}
         if(state.Stories.Threads.Any(t=>t.QueuedVisitScene>=0)){message="已有伙伴到访预约，先完成或取消它";return;}
         message=PhoneCommissionClients.QueueVisit(state.Commissions,index,stage,Day);WriteState();
         if(state.Commissions.Entries[index].QueuedStage==stage)Close();
@@ -59,11 +61,12 @@ public sealed partial class PhoneBehaviour
     {
         if(selectedCommission<0)
         {
-            Small(42,187,350,"熟人带着具体需求来，不再只看成交次数");
+            Btn(36,183,179,34,"熟人委托",()=>{});Btn(225,183,179,34,"夜班求购",OpenNightOrders);Fill(36,216,179,2,Gold);
+            Small(42,231,350,"熟人带着具体需求来，不再只看成交次数");
             for(int i=0;i<3;i++)
             {
-                int index=i;var entry=state!.Commissions.Entries[i];bool known=state.Stories.Threads[i].Phase>=1;float y=230+i*135;
-                Surface(36,y,368,120,"commission:"+i,()=>selectedCommission=index);
+                int index=i;var entry=state!.Commissions.Entries[i];bool known=state.Stories.Threads[i].Phase>=1;float y=267+i*124;
+                Surface(36,y,368,109,"commission:"+i,()=>selectedCommission=index);
                 Label(50,y+11,330,31,CommissionRules.GetName(i),true);
                 Small(50,y+48,330,known?entry.ItemName+" ×"+entry.RequiredUnits:"先在柜台认识这位伙伴");
                 Small(50,y+83,330,known?CommissionStatusText(entry):"保留原任务 · 见面后开放实物委托");
@@ -85,6 +88,7 @@ public sealed partial class PhoneBehaviour
             Btn(36,556,368,41,$"预约来店收货 · 还需 {remaining} 件",()=>InviteCommission(selected,1),owned>0&&Day<=order.Deadline);
         else if(order.Status is CommissionStatus.Unaccepted or CommissionStatus.Deferred)
             Btn(36,556,368,41,Day<order.AvailableDay?$"D{order.AvailableDay} 再谈委托":"邀请来柜台谈委托",()=>InviteCommission(selected,0),Day>=order.AvailableDay&&order.ItemId.Length>0);
+        else if(selected==2&&order.Status==CommissionStatus.Completed&&FollowupVisible())Btn(36,556,368,41,"洛克修好货梯了 · 查看回访",OpenFollowupTask);
         else Btn(36,556,368,41,"回柜台继续营业",Close);
         Btn(36,611,179,35,"查看货柜",()=>Navigate("货柜"));Btn(225,611,179,35,"联系供应商",()=>Navigate("供应商"));
         if(order.QueuedStage>=0)Btn(36,660,368,34,"取消本次到访预约",()=>{message=PhoneCommissionClients.CancelVisit(state.Commissions,selected);WriteState();});
@@ -127,7 +131,7 @@ public sealed partial class PhoneBehaviour
         if(state.PendingRecommendation){Navigate("商脉");return;}
         if(Store.dayUntilRent<=2&&Store.GetCash()<Store.GetRentValue()){Navigate("周转指引");return;}
         int active=PreferredCommission();
-        if(active>=0){OpenCommissions(active);return;}Navigate("任务");
+        if(active>=0){OpenCommissions(active);return;}if(PreferNightOrder()){OpenNightOrders();return;}if(PreferLostCall()){OpenLostCall();return;}if(PreferFollowup()){OpenFollowupTask();return;}Navigate("任务");
     }
     [HideFromIl2Cpp] private int PreferredCommission()
     {

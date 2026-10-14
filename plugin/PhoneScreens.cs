@@ -50,6 +50,8 @@ public sealed partial class PhoneBehaviour
                 case "彩票":DrawLottery();break;case "音乐":DrawMusic();break;
                 case "短视频":DrawVideos();break;case "设置":DrawSettings();break;case "账本":DrawLedger();break;
                 case "商脉":DrawContacts();break;case "履历":DrawCareer();break;case "通讯":case "任务":DrawTasks();break;case "来信":DrawLetter();break;case "更多":DrawMore();break;case "货柜":DrawCargo();break;case "流转簿":DrawBusinessLedger();break;
+                case "夜班求购":DrawNightOrders();break;case "夜班收据":DrawNightOrderHistory();break;
+                case "失物来电":DrawLostCall();break;case "失物回执":DrawLostCallReceipt();break;
                 case "实物委托":DrawCommissions();break;case "周转指引":DrawWorkingCapital();break;
             }
             Btn(36,756,179,40,"返回主屏",()=>Navigate("主页"));Btn(225,756,179,40,"收起手机",Close);
@@ -90,10 +92,26 @@ public sealed partial class PhoneBehaviour
     }
     [HideFromIl2Cpp] private void DrawSuppliers()
     {
-        Small(42,183,350,$"联络费 {SupplierFee()} · {FreeSupplierCalls()} 次免费/日"+(Store.IsClientPresent()?" · 忙碌可预约":""));
+        int baseFee=SupplierFee();
+        Small(42,183,350,$"每日免费联络 {FreeSupplierCalls()} 次 · 货品照常议价");
         string[] names={"食品供应商","日用品供应商","材料供应商","药品供应商"};string[] goods={"食品 · 饮水 · 农产品","居家用品 · 店铺补给","矿料 · 零件 · 工业材料","药品 · 急救物资"};
-        for(int i=0;i<4;i++){int kind=i;float y=223+i*98;Surface(36,y,368,84,"supplier:"+i,()=>RequestSupplier(kind));view!.Icon(48,y+15,46,"supplier",()=>{pendingAction=()=>RequestSupplier(kind);});Label(106,y+13,235,26,names[i]);Small(106,y+47,240,goods[i]);}
-        if(state!.PendingSupplier>=0)Btn(36,624,368,38,"取消当前预约",()=>{state.PendingSupplier=-1;WriteState();message="预约已取消";});
+        for(int i=0;i<4;i++)
+        {
+            int kind=i,fee=SupplierFeeFor(kind);float y=223+i*98;
+            Surface(36,y,368,84,"supplier:"+i,()=>RequestSupplier(kind));
+            view!.Icon(48,y+15,46,"supplier",()=>{pendingAction=()=>RequestSupplier(kind);});
+            Label(106,y+13,193,26,names[i]);Small(106,y+47,194,goods[i]);
+            view.Label(306,y+10,86,31,fee==0?"免费":fee.ToString(),true,true,19);
+            view.Label(294,y+49,99,20,fee<baseFee?"洛克安排":"联络费",false,true,13);
+        }
+        if(state!.PendingSupplier>=0)
+        {
+            Small(42,609,350,$"已预约 {SupplierLabel(state.PendingSupplier)} · 联络费上限 {state.PendingSupplierFeeCap}");
+            Btn(36,646,179,32,"取消当前预约",()=>{state.PendingSupplier=-1;WriteState();message="预约已取消";});
+            if(FollowupVisible())Btn(225,646,179,32,"查看货路安排",OpenFollowupTask);
+        }
+        else if(FollowupVisible())Btn(36,624,368,38, state.Followups.Phase==FollowupPhase.Active?$"洛克货路安排 · 余 {FollowupRules.Remaining(state.Followups)} 次":"洛克 · 查看货路回访",OpenFollowupTask);
+        Small(42,690,350,state.Business.FreeMode?"自由模式免费，洛克的安排保留":baseFee==0?"免费额度先用，洛克的安排不会消耗":"成功排入供应商队列时结算联络费与安排");
     }
     [HideFromIl2Cpp] private void DrawStocks()
     {

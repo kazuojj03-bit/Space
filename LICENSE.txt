@@ -1,0 +1,9 @@
+SpacePhone 自有内容使用说明
+
+SpacePhone 自有代码、对白、程序绘制素材由作者保留相应权利。公开源码用于安全审查和个人本地编译；未选择或附加MIT等宽泛开源授权，不应把“源码可见”称为已经获得任意再分发许可。
+允许用户安装发行版本并做个人备份。修改后再发布或在其它项目使用自有内容，请取得作者明确许可。Nexus托管与分发另适用平台条款。
+
+Probably Stolen、Unity、BepInEx、HarmonyX、Il2CppInterop、Microsoft产品及抖音/TikTok等权利归各自权利人。本包不包含这些第三方的原程序、资源、字体或运行时；外部依赖适用自己的许可证。
+已核对现有依赖来源：BepInEx LGPL2.1；Il2CppInterop LGPL3；HarmonyX MIT；.NET MIT。此文本不替代其原许可证，也不是对任何第三方许可状态的全面法律保证。
+
+生成式AI广泛参与代码、界面、对白与美术工具设计，应如实标AI-Generated Content；AI宣传内容对应AI Media。此Mod不是原游戏开发者、Apple或社交平台的官方产品。

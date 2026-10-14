@@ -236,7 +236,7 @@ internal sealed class PhoneCommissionClients
     }
 
     internal void Tick(PlayerStore player, CommissionBook book, int currentDay,
-        Action<int, int> choice, Action write, Action close)
+        Action<int, int> choice, Action write, Action close, bool allowScheduling = true)
     {
         if (owner != player.Pointer || run != player.runID)
         {
@@ -270,6 +270,8 @@ internal sealed class PhoneCommissionClients
             { current.isMainDialogueStarted = false; current.StartMainDialogue(); }
             return;
         }
+        // Updating the client already at the counter is independent of new scheduling.
+        if (!allowScheduling) return;
         if (player.IsClientPresent() || player.storeState != PlayerStore.StoreState.OPEN ||
             player.playerLocation != PlayerStore.PlayerLocation.IN_STORE || player.lockAllFlag > 0 ||
             player.lockNextBellFlag > 0 || player.isHandlingShootout || player.isClientBeingArrested ||

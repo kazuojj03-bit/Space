@@ -14,13 +14,17 @@ internal sealed class PhoneVisitors
     internal static PhoneVisitors? Live;
     private PlayerStore? store;
     private StoryBook? stories;
+    private FollowupBook? followups;
     private ShopActivity activity;
     private int day;
     private IntPtr owner;
     private string run = "";
     private Action<int, int, int>? onChoice;
+    private Action<int>? onFollowupChoice;
     private Action? save, closePhone;
     private readonly HashSet<IntPtr> arrived = new();
+    // A choice owns its native reply/departure chain until the visitor actually leaves.
+    private readonly HashSet<IntPtr> answering = new();
     private readonly Dictionary<IntPtr, string> configured = new();
     private readonly Dictionary<IntPtr, List<Delegate>> pinned = new();
     private readonly Dictionary<IntPtr, float> dismissCleanup = new();
@@ -73,21 +77,27 @@ internal sealed class PhoneVisitors
     }
 
     /// <summary>Call after phone state ownership has been established. Scheduling never dismisses another client.</summary>
-    internal void Tick(PlayerStore player, StoryBook book, ShopActivity observedActivity, int currentDay,
-        Action<int, int, int> choice, Action write, Action close)
+    internal void Tick(PlayerStore player, StoryBook book, FollowupBook followupBook, ShopActivity observedActivity, int currentDay,
+        Action<int, int, int> choice, Action<int> followupChoice, Action write, Action close, bool allowScheduling = true)
     {
         if (owner != player.Pointer || run != player.runID)
         {
             owner = player.Pointer; run = player.runID;
-            arrived.Clear(); configured.Clear(); pinned.Clear(); dismissCleanup.Clear();
+            arrived.Clear(); answering.Clear(); configured.Clear(); pinned.Clear(); dismissCleanup.Clear();
         }
-        store = player; stories = book; activity = observedActivity; day = currentDay;
-        onChoice = choice; save = write; closePhone = close;
+        if (!ReferenceEquals(stories, book) || !ReferenceEquals(followups, followupBook))
+        {
+            // A reload may replace normalized books without changing the native store/run identity.
+            // Rebind waiting menus to those books, while retaining a selected reply/departure chain.
+            configured.Clear(); arrived.Clear();
+        }
+        store = player; stories = book; followups = followupBook; activity = observedActivity; day = currentDay;
+        onChoice = choice; onFollowupChoice = followupChoice; save = write; closePhone = close;
         var current = player.currentClientInstance?.storeClient;
         foreach (var entry in dismissCleanup.ToArray())
         {
             if (Time.unscaledTime < entry.Value || current?.Pointer == entry.Key || StoreClientMono.Instance?.IsMoving() == true) continue;
-            dismissCleanup.Remove(entry.Key); configured.Remove(entry.Key); arrived.Remove(entry.Key); pinned.Remove(entry.Key);
+            dismissCleanup.Remove(entry.Key); configured.Remove(entry.Key); arrived.Remove(entry.Key); answering.Remove(entry.Key); pinned.Remove(entry.Key);
         }
         if (current != null && TryParse(current.identifier, out int currentIndex, out int currentScene))
         {
@@ -109,6 +119,9 @@ internal sealed class PhoneVisitors
             if (player.isClientArrived) RecordArrival(current, currentIndex, currentScene);
             return;
         }
+        // Keep an already arrived conversation synchronized, but never let a new arrival
+        // discard a queued phone click or take over an open confirmation.
+        if (!allowScheduling) return;
         if (player.IsClientPresent() || player.storeState != PlayerStore.StoreState.OPEN || player.playerLocation != PlayerStore.PlayerLocation.IN_STORE ||
             player.lockAllFlag > 0 || player.lockNextBellFlag > 0 || player.isHandlingShootout ||
             player.isClientBeingArrested || player.isSecurityAlarmActive ||
@@ -160,10 +173,23 @@ internal sealed class PhoneVisitors
         PlayerStore.Instance.Pointer == expectedOwner && PlayerStore.Instance.runID == expectedRun &&
         owner == expectedOwner && run == expectedRun;
 
+    private bool CurrentConversation(StoreClient client, IntPtr expectedOwner, string expectedRun,
+        StoryBook? expectedStories, FollowupBook? expectedFollowups) =>
+        CurrentOwner(expectedOwner, expectedRun) && ReferenceEquals(stories, expectedStories) &&
+        ReferenceEquals(followups, expectedFollowups) && store?.currentClientInstance?.storeClient.Pointer == client.Pointer;
+
     private bool Configure(StoreClient client, int index, int scene)
     {
+        // Timer polling can update availability or remaining calls while an answer is on screen.
+        // Never interrupt that answer, including the native player-reply bubble before it.
+        if (answering.Contains(client.Pointer)) return false;
         int expectedPhase = stories?.Threads[index].Phase ?? -1;
-        string signature = owner + ":" + run + ":" + expectedPhase;
+        var expectedStories = stories; var expectedFollowups = followups;
+        string followupSignature = index == 2 && scene == 3 && followups != null
+            ? ":" + followups.Phase + ":" + followups.Disabled + ":" + followups.Route + ":" + followups.Calls.Count +
+              ":" + string.Join(",", FollowupRules.Choices(followups, day).Select(c => c.Key))
+            : "";
+        string signature = owner + ":" + run + ":" + expectedPhase + followupSignature;
         if (configured.TryGetValue(client.Pointer, out var old) && old == signature) return false;
         configured[client.Pointer] = signature;
         if (!pinned.TryGetValue(client.Pointer, out var keep)) { keep = new List<Delegate>(); pinned[client.Pointer] = keep; }
@@ -196,8 +222,9 @@ internal sealed class PhoneVisitors
             {
                 try
                 {
-                    if (!CurrentOwner(expectedOwner, expectedRun) || store?.currentClientInstance?.storeClient.Pointer != client.Pointer ||
+                    if (!CurrentConversation(client, expectedOwner, expectedRun, expectedStories, expectedFollowups) ||
                         stories!.Threads[index].Phase != expectedPhase || !SceneAllowed(stories, index, scene, day, activity)) return;
+                    answering.Add(client.Pointer);
                     onChoice?.Invoke(index, scene, capturedKey);
                     save?.Invoke();
                 }
@@ -221,7 +248,12 @@ internal sealed class PhoneVisitors
                 DialogUIManager.Instance?.CurrentClientLeave(.6f);
         };
         keep.Add(deferLeave); defer.SetEndAction((Il2CppSystem.Action)deferLeave);
-        AddNativeChoice(dialog, new GameItem("spacephone.choice.defer"), "改天再谈", "保留任务进度，不做选择。", defer);
+        Action deferAnswer = () =>
+        {
+            if (CurrentConversation(client, expectedOwner, expectedRun, expectedStories, expectedFollowups)) answering.Add(client.Pointer);
+        };
+        keep.Add(deferAnswer);
+        AddNativeChoice(dialog, new GameItem("spacephone.choice.defer"), "改天再谈", "保留任务进度，不做选择。", defer, (Il2CppSystem.Action)deferAnswer);
         client.mainDialogue = dialog; client.repeatDialogue = dialog;
         client.allDoneDialogue = defer; client.interogationDialogue = defer;
         return true;
@@ -266,19 +298,79 @@ internal sealed class PhoneVisitors
     private Dialogue CheckInDialogue(StoreClient client, int index, List<Delegate> keep, IntPtr expectedOwner, string expectedRun)
     {
         var thread = stories!.Threads[index];
-        var dialog = new Dialogue().SetText("CLIENT", index switch
+        var expectedStories = stories; var expectedFollowups = followups;
+        int expectedStoryPhase = thread.Phase;
+        var extraChoices = index == 2 && followups != null ? FollowupRules.Choices(followups, day) : Array.Empty<FollowupChoice>();
+        bool hasFollowup = extraChoices.Length > 0;
+        string opening = hasFollowup ? FollowupRules.OfferText(followups!, day) : index switch
         {
             0 => "雨鸦把旧复核表翻到新的一页。\n“我路过楼下，来看看你的柜台。哪一步还有疑问？我们把它说清楚。”",
             1 => "阿岚在门口擦了擦鞋底的雨水。\n“诊所那边暂时安静了。你这边怎么样？想聊聊补给，还是接下来该做什么？”",
             _ => "洛克把货运手套塞回口袋。\n“正好经过这一层，进来打个招呼。货路和合作，哪一头还让你犯难？”"
-        });
-        dialog.isMainDialog = true;
+        };
+        var first = TextPages(opening, out var dialog);
+        first.isMainDialog = true; dialog.isMainDialog = true;
         Action leave = () =>
         {
             if (CurrentOwner(expectedOwner, expectedRun) && store?.currentClientInstance?.storeClient.Pointer == client.Pointer)
                 DialogUIManager.Instance?.CurrentClientLeave(.6f);
         };
         keep.Add(leave);
+        Action markAnswer = () =>
+        {
+            if (CurrentConversation(client, expectedOwner, expectedRun, expectedStories, expectedFollowups)) answering.Add(client.Pointer);
+        };
+        keep.Add(markAnswer);
+        if (hasFollowup)
+        {
+            var expectedBook = followups!;
+            var expectedPhase = expectedBook.Phase;
+            foreach (var extraChoice in extraChoices)
+            {
+                int key = extraChoice.Key;
+                // A single answer bubble is changed by the validated callback before native playback.
+                // Stale clicks therefore cannot announce a route choice that was never committed.
+                var answer = new Dialogue().SetText("CLIENT", "我们先把这页记录对上。");
+                bool handled = false;
+                Action action = () =>
+                {
+                    try
+                    {
+                        if (handled) return;
+                        if (!CurrentConversation(client, expectedOwner, expectedRun, expectedStories, expectedBook) ||
+                            stories!.Threads[index].Phase != expectedStoryPhase || expectedBook.Phase != expectedPhase ||
+                            !FollowupRules.Choices(expectedBook, day).Any(c => c.Key == key))
+                        {
+                            answer.SetText("CLIENT", "这页记录已经更新。这次没有更改路线，也没有消耗联络优惠。先继续营业，下次看手机里的新提示。");
+                            answer.SetEndAction((Il2CppSystem.Action)leave);
+                            return;
+                        }
+                        handled = true;
+                        answering.Add(client.Pointer);
+                        onFollowupChoice?.Invoke(key);
+                        bool committed = key == 2 || key == 3 && expectedBook.Phase == FollowupPhase.Completed ||
+                            (key is 0 or 1) && expectedBook.Phase == FollowupPhase.Active && expectedBook.Route == key;
+                        if (!committed)
+                        {
+                            answer.SetText("CLIENT", "这页安排暂时没有确认。路线和余下次数保持原样，先回手机查看当前提示，我们改天再谈。");
+                            answer.SetEndAction((Il2CppSystem.Action)leave);
+                            return;
+                        }
+                        save?.Invoke();
+                        FillTextPages(answer, FollowupAnswer(expectedBook, key), (Il2CppSystem.Action)leave);
+                    }
+                    catch (Exception ex)
+                    {
+                        answer.SetText("CLIENT", "这页联络单暂时没能写完。先继续营业，手机里的记录会保留已经确认的进度。");
+                        answer.SetEndAction((Il2CppSystem.Action)leave);
+                        Plugin.Error(ex);
+                    }
+                };
+                keep.Add(action);
+                AddNativeChoice(dialog, new GameItem("spacephone.checkin.followup." + key), extraChoice.Label, extraChoice.Detail,
+                    answer, (Il2CppSystem.Action)action);
+            }
+        }
         string next = thread.Phase switch
         {
             1 => StoryRules.GetMessage(stories, index, day, activity),
@@ -286,6 +378,11 @@ internal sealed class PhoneVisitors
             3 => day > thread.FollowupDay ? "确认材料已经到了。打开手机任务，邀请我正式交接，我们在柜台把最后一步做完。" : "我需要一夜整理确认材料。明天打开手机任务，邀请我来柜台做最后的交接。",
             _ => "这次委托已经完成。合作与研究回报都在手机记录里，接下来的普通顾客和原有故事照常继续。"
         };
+        if (index == 2 && followups != null && followups.Phase != FollowupPhase.Locked && !followups.Disabled)
+        {
+            var guide = FollowupRules.GetGuide(followups, day);
+            next = guide.Step + "\n" + guide.Progress + "\n" + guide.Instruction;
+        }
         string cooperation = index switch
         {
             0 => "成本、售价和利润要能对上。研究行情只给你一个判断区间，不是必赚的保证；商品的情况仍得你自己查看。",
@@ -293,11 +390,21 @@ internal sealed class PhoneVisitors
             _ => "新货源会占住现金，旧货转不出去也一样。先看手机货柜里有什么，再决定联络哪类供应商。"
         };
         if (thread.Phase == 4) cooperation += thread.Outcome == 0 ? "\n我们约好的长期服务优惠已经生效，每次联络都按手机标明的价格结算。" : "\n你选择了独立研究。材料已归档，不会在每次见面时重复获得。";
-        AddNativeChoice(dialog, new GameItem("spacephone.checkin.guide"), "再讲讲我该做什么", "把当前目标和下一步说清楚。", Explain(index, next, (Il2CppSystem.Action)leave));
-        AddNativeChoice(dialog, new GameItem("spacephone.checkin.chat"), "聊聊合作", "只聊经营，不更改路线或发放奖励。", Explain(index, cooperation, (Il2CppSystem.Action)leave));
-        AddNativeChoice(dialog, new GameItem("spacephone.checkin.leave"), "我先继续营业", "保留任务进度。", Explain(index, "好，先照顾你的柜台。需要时再从手机邀请我。", (Il2CppSystem.Action)leave));
-        return dialog;
+        if (index == 2 && followups != null && followups.Phase == FollowupPhase.Completed && !followups.Disabled)
+            cooperation += "\n" + FollowupRules.GetOutcomeText(followups);
+        AddNativeChoice(dialog, new GameItem("spacephone.checkin.guide"), "再讲讲我该做什么", "把当前目标和下一步说清楚。", Explain(index, next, (Il2CppSystem.Action)leave), (Il2CppSystem.Action)markAnswer);
+        AddNativeChoice(dialog, new GameItem("spacephone.checkin.chat"), "聊聊合作", "只聊经营，不更改路线或发放奖励。", Explain(index, cooperation, (Il2CppSystem.Action)leave), (Il2CppSystem.Action)markAnswer);
+        AddNativeChoice(dialog, new GameItem("spacephone.checkin.leave"), "我先继续营业", "保留任务进度。", Explain(index, "好，先照顾你的柜台。需要时再从手机邀请我。", (Il2CppSystem.Action)leave), (Il2CppSystem.Action)markAnswer);
+        return first;
     }
+
+    private static string FollowupAnswer(FollowupBook book, int key) => key switch
+    {
+        0 => "那就把材料线接稳。三次有费用的材料供应商联络，每次少十块。先用当天原有的免费额度；我这张单子只记真正付费且成功的联络。",
+        1 => "给你留一回机动联络，任一供应商都能用，最多少二十块。先用当天原有的免费额度；等确实需要付费联络时，再用它。",
+        2 => "不急着签。你先看看柜台缺什么，这页还留着。明天或以后需要时，再从手机邀请我。",
+        _ => "这页货路记录收好了。" + FollowupRules.GetOutcomeText(book)
+    };
 
     private static void AddNativeChoice(Dialogue dialog, GameItem item, string label, string description, Dialogue next,
         Il2CppSystem.Action? action = null)
@@ -311,10 +418,11 @@ internal sealed class PhoneVisitors
         dialog.AddChoice(item, label, description, reply, action);
     }
 
-    private static Dialogue Explain(int index, string text, Il2CppSystem.Action leave)
+    private static List<string> TextChunks(string text)
     {
-        // Keep explanatory branches readable in native bubbles rather than putting a long phone letter in one.
+        // Keep original dialogue pages short enough for the game's own counter bubbles.
         var chunks = new List<string>();
+        text = (text ?? "").Trim();
         while (text.Length > 110)
         {
             int end = text.LastIndexOf('。', 109, 90);
@@ -322,9 +430,35 @@ internal sealed class PhoneVisitors
             chunks.Add(text[..(end + 1)]); text = text[(end + 1)..].TrimStart();
         }
         if (text.Length > 0) chunks.Add(text);
-        var first = new Dialogue().SetText("CLIENT", chunks[0]); var current = first;
-        for (int i = 1; i < chunks.Count; i++) { var next = new Dialogue().SetText("CLIENT", chunks[i]); current.SetNextDialogue(next); current = next; }
-        current.SetEndAction(leave); return first;
+        if (chunks.Count == 0) chunks.Add("先继续营业，需要时再联系我。");
+        return chunks;
+    }
+
+    private static Dialogue TextPages(string text, out Dialogue last)
+    {
+        var chunks = TextChunks(text);
+        var first = new Dialogue().SetText("CLIENT", chunks[0]); last = first;
+        for (int i = 1; i < chunks.Count; i++)
+        {
+            var next = new Dialogue().SetText("CLIENT", chunks[i]); last.SetNextDialogue(next); last = next;
+        }
+        return first;
+    }
+
+    private static void FillTextPages(Dialogue first, string text, Il2CppSystem.Action leave)
+    {
+        var chunks = TextChunks(text);
+        first.SetText("CLIENT", chunks[0]); var current = first;
+        for (int i = 1; i < chunks.Count; i++)
+        {
+            var next = new Dialogue().SetText("CLIENT", chunks[i]); current.SetNextDialogue(next); current = next;
+        }
+        current.SetEndAction(leave);
+    }
+
+    private static Dialogue Explain(int index, string text, Il2CppSystem.Action leave)
+    {
+        var first = TextPages(text, out var last); last.SetEndAction(leave); return first;
     }
 
     private static string SceneText(StoryBook book, int index, int scene)

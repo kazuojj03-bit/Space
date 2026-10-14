@@ -1,1 +1,0 @@
-Project author permissions retained. Source is supplied for inspection and build review; no new permissive project license is granted. Third-party copyright/license notices apply to their respective files. No original game or platform account assets are included.

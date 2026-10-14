@@ -23,6 +23,9 @@ public sealed class PhoneState
     public BusinessState Business { get; set; } = new();
     public StoryBook Stories { get; set; } = new();
     public CommissionBook Commissions { get; set; } = new();
+    public FollowupBook Followups { get; set; } = new();
+    public LostCallBook LostCall { get; set; } = new();
+    public NightOrderBook NightOrders { get; set; } = new();
     public int SupplierCallDay { get; set; } = -1;
     public int SupplierCallsToday { get; set; }
     public int RecommendedDay { get; set; } = -1;
@@ -104,12 +107,32 @@ public static class Economy
     public static string Encode(PhoneState s) => JsonSerializer.Serialize(s);
     public static PhoneState Decode(string json)
     {
-        var state = JsonSerializer.Deserialize<PhoneState>(json) ?? throw new InvalidDataException("Empty phone data");
+        using var document=JsonDocument.Parse(json);
+        if(document.RootElement.ValueKind!=JsonValueKind.Object)throw new InvalidDataException("Invalid phone save object");
+        string? followupJson=document.RootElement.TryGetProperty(nameof(PhoneState.Followups),out var followup)?followup.GetRawText():null;
+        string? lostCallJson=document.RootElement.TryGetProperty(nameof(PhoneState.LostCall),out var lostCall)?lostCall.GetRawText():null;
+        string? nightOrdersJson=document.RootElement.TryGetProperty(nameof(PhoneState.NightOrders),out var nightOrders)?nightOrders.GetRawText():null;
+        // An additive chapter cannot prevent the original phone from loading when its JSON types are damaged.
+        using var payload=new MemoryStream();
+        using(var writer=new Utf8JsonWriter(payload))
+        {
+            writer.WriteStartObject();
+            foreach(var property in document.RootElement.EnumerateObject())
+                if(property.Name!=nameof(PhoneState.Followups)&&property.Name!=nameof(PhoneState.LostCall)&&property.Name!=nameof(PhoneState.NightOrders))property.WriteTo(writer);
+            writer.WriteEndObject();
+        }
+        var state = JsonSerializer.Deserialize<PhoneState>(payload.ToArray()) ?? throw new InvalidDataException("Empty phone data");
+        state.Followups=followupJson==null?new FollowupBook():FollowupRules.Decode(followupJson);
+        state.LostCall=lostCallJson==null?new LostCallBook():LostCallRules.Decode(lostCallJson);
+        state.NightOrders=nightOrdersJson==null?new NightOrderBook():NightOrderRules.Decode(nightOrdersJson);
         state.LikedVideos ??= new();
         state.Ledger ??= new();
         state.CostBasis ??= new long[4];
         state.Business ??= new();BusinessRules.Validate(state.Business);state.Stories=StoryRules.Validate(state.Stories);
         state.Commissions=CommissionRules.Validate(state.Commissions);
+        state.Followups=FollowupRules.Validate(state.Followups);
+        state.LostCall=LostCallRules.Validate(state.LostCall);
+        state.NightOrders=NightOrderRules.Validate(state.NightOrders);
         if(state.ActiveStory is < -1 or > 2)state.ActiveStory=-1;
         if(state.SupplierCallDay < -1 || state.SupplierCallsToday < 0 || state.SupplierCallsToday >100000 || state.RecommendedDay < -1 || state.PendingSupplierFeeCap is <0 or >20 || state.PendingRecommendationFeeCap is <0 or >40)throw new InvalidDataException("Invalid phone schedule");
         if(state.CostBasis.Length!=4 || state.CostBasis.Any(x=>x<0) || state.Ledger.Count>40)throw new InvalidDataException("Invalid ledger or portfolio data");

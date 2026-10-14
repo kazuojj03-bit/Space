@@ -15,19 +15,24 @@ public sealed partial class PhoneBehaviour
         var lot=B.Lots.FirstOrDefault(l=>l.ItemUid==uid&&l.ItemId==id);
         if(!purchase&&lot?.CostKnown==true&&lot.Units!=units)BusinessRules.InvalidateLot(B,uid,id);
         if(!purchase)RecordCommissionTrade(uid,id,units,amount,customerId);
-        if(BusinessRules.RecordTrade(B,Day,purchase,uid,id,name,category,units,amount,customerId,publicName))
-        {StoryRules.RecordTrade(state.Stories,Day,purchase,customerId,category,amount);WriteState();nextDraw=0;nextCargoScan=0;Plugin.Instance.Log.LogInfo($"Native merchandise trade: {(purchase?"buy":"sell")} {id} x{units} value={amount}");}
+        string publicContactId=LostCallClients.TryParse(customerId,out _)?LostCallRules.ContactId:
+            NightOrderClients.ContactIdFor(customerId)??customerId;
+        if(BusinessRules.RecordTrade(B,Day,purchase,uid,id,name,category,units,amount,publicContactId,publicName))
+        {StoryRules.RecordTrade(state.Stories,Day,purchase,publicContactId,category,amount);WriteState();nextDraw=0;nextCargoScan=0;ClearNightStock();Plugin.Instance.Log.LogInfo($"Native merchandise trade: {(purchase?"buy":"sell")} {id} x{units} value={amount}");}
     }
     [HideFromIl2Cpp] private ShopActivity Activity()=>new(B.PurchaseCount,B.SaleCount,B.KnownResaleCount,B.UniqueClientIds.Count,B.PurchasedCategories.Count);
     [HideFromIl2Cpp] private void SyncStoryBenefits()=>B.ResearchDailyBonus=state!.Stories.Threads.Any(t=>t.Completed&&t.Outcome==1)?1:0;
     [HideFromIl2Cpp] private string NextGoal()
     {
         if(state==null)return "正在同步店铺资料";
-        if(state.PendingSupplier>=0)return "供应商已预约 · 空闲后到访";
+        if(state.PendingSupplier>=0)return $"{SupplierLabel(state.PendingSupplier)}已预约 · 空闲后到访";
         if(state.PendingRecommendation)return "熟客推荐已预约 · 空闲后到访";
         if(Store.dayUntilRent<=2&&Store.GetCash()<Store.GetRentValue())return $"租金临近 · 还差 {Money(Store.GetRentValue()-Store.GetCash())}";
         int preferred=PreferredCommission();
         if(preferred>=0){var commission=state.Commissions.Entries[preferred];return commission.QueuedStage>=0?$"实物委托 · {CommissionRules.GetName(preferred)} 已预约到访":$"实物委托 · {commission.ItemName} {commission.DeliveredUnits}/{commission.RequiredUnits}\n最迟 D{commission.Deadline} 当天收工前交付";}
+        if(PreferNightOrder()){var order=NightOrderRules.GetGuide(state.NightOrders,Day);return "夜班求购 · "+order.Step+"\n"+order.Progress;}
+        if(PreferLostCall()){var lost=LostCallRules.GetGuide(state.LostCall,Day);return "失物来电 · "+lost.Step+"\n"+lost.Progress;}
+        if(PreferFollowup()&&state.Followups.Phase!=FollowupPhase.Active){var followup=FollowupRules.GetGuide(state.Followups,Day);return "洛克回访 · "+followup.Step+"\n"+followup.Progress;}
         return TaskGuide.GetSummary(state.Stories,state.ActiveStory,Day,Activity(),B.ResearchPoints);
 
     }
@@ -44,7 +49,32 @@ public sealed partial class PhoneBehaviour
     [HideFromIl2Cpp] internal void InheritSplitResearch(GameItem source,GameItem child)
     {if(state!=null&&Ready&&BusinessRules.InheritResearchIdentity(B,source.uniqueId.ToString(),child.uniqueId.ToString()))WriteState();}
     [HideFromIl2Cpp] private void RequestSupplier(int kind)
-    {int fee=SupplierFee();if(fee==0)Summon(kind,0);else Ask("联络供应商",$"本次最多支付 {fee} 联络费。\n忙碌时先预约，实际到访时按不高于此价结算。\n每天有免费额度，超额仍可付费联络。",()=>Summon(kind,fee));}
+    {
+        if(!OwnsPhoneRun()||kind is <0 or >3){message="店铺资料已变化，请重新确认联络";return;}
+        int fee=SupplierFeeFor(kind),baseFee=SupplierFee();
+        string detail=SupplierFollowupQuote(kind,baseFee,fee);
+        if(state!.PendingSupplier>=0)
+        {
+            var expected=state;int previous=state.PendingSupplier,previousCap=state.PendingSupplierFeeCap;
+            if(previous==kind && fee<=previousCap){message=$"{SupplierLabel(kind)}已预约，联络费上限 {previousCap}；没有重复排队或扣费";return;}
+            bool update=previous==kind;
+            Ask(update?"更新预约联络费":"更改供应商预约",
+                update?$"{SupplierLabel(kind)}仍保留。\n联络费上限由 {previousCap} 调整为 {fee}。\n取消会保留原预约与原上限；确认只更新预约，不会立即扣费。":$"{SupplierLabel(previous)} → {SupplierLabel(kind)}\n新联络费上限 {fee}。\n取消保留原预约；确认只替换预约，成功排入队列后才结算。",
+                ()=>AmendSupplierReservation(expected,previous,previousCap,kind,fee));
+            return;
+        }
+        if(baseFee==0)Summon(kind,0);
+        else Ask("联络供应商",$"本次最多支付 {fee} 联络费。\n{detail}\n忙碌时先预约；成功加入供应商队列后结算费用和安排。",()=>Summon(kind,fee));
+    }
+    [HideFromIl2Cpp] private static string SupplierLabel(int kind)=>kind is >=0 and <=3?FollowupRules.SupplierNames[kind]+"供应商":"供应商";
+    [HideFromIl2Cpp] private void AmendSupplierReservation(PhoneState expected,int previous,int previousCap,int kind,int feeCap)
+    {
+        if(!OwnsPhoneRun()||!ReferenceEquals(state,expected)||state!.PendingSupplier!=previous||state.PendingSupplierFeeCap!=previousCap)
+        {message="预约已变化，已保留当前安排；请重新确认";return;}
+        if(SupplierFeeFor(kind)>feeCap){message="联络费已变化，原预约保留；请重新确认";return;}
+        state.PendingSupplier=kind;state.PendingSupplierFeeCap=Math.Max(0,feeCap);WriteState();
+        message=$"已预约 {SupplierLabel(kind)} · 联络费上限 {feeCap}，目前未扣费";
+    }
     [HideFromIl2Cpp] private void AskRecommendation()
     {
         if(B.Career!=0||BusinessRules.Tier(B)<1){message="取得商脉经纪执照后开放推荐";return;}

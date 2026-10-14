@@ -18,7 +18,14 @@ public static class PhoneNativeTradePatch
         internal string Uid = "", ItemId = "", ItemName = "", Category = "other";
         internal int Units, Amount;
         internal string CustomerId = "", PublicName = "";
+        internal LostCallClients.NativeTradeCapture? LostCallCapture;
+        internal NightOrderClients.NativeTradeCapture? NightOrderCapture;
     }
+
+    private static LostCallClients.NativeTradeCapture? CaptureLostCall(IntPtr clientPointer, bool purchase, GameItem item)
+    { try { return LostCallClients.Live?.CaptureTradeBefore(clientPointer, purchase, item); } catch (Exception ex) { Plugin.Error(ex); return null; } }
+    private static NightOrderClients.NativeTradeCapture? CaptureNightOrder(IntPtr clientPointer, bool purchase, GameItem item)
+    { try { return NightOrderClients.Live?.CaptureTradeBefore(clientPointer, purchase, item); } catch (Exception ex) { Plugin.Error(ex); return null; } }
 
     public static void Prefix(int value, StoreClient storeClient, bool isPlayerSold,
         GameItem gameItem, out Snapshot? __state)
@@ -65,7 +72,9 @@ public static class PhoneNativeTradePatch
                 // it is the total payment rather than a per-unit reference price.
                 Amount = value,
                 CustomerId = storeClient.identifier ?? "",
-                PublicName = string.IsNullOrWhiteSpace(publicName) ? "访客" : publicName
+                PublicName = string.IsNullOrWhiteSpace(publicName) ? "访客" : publicName,
+                LostCallCapture = CaptureLostCall(storeClient.Pointer, !isPlayerSold, gameItem),
+                NightOrderCapture = CaptureNightOrder(storeClient.Pointer, !isPlayerSold, gameItem)
             };
         }
         catch (Exception ex) { Plugin.Error(ex); }
@@ -83,6 +92,14 @@ public static class PhoneNativeTradePatch
                 !string.Equals(store.runID ?? "", __state.RunId, StringComparison.Ordinal)) return;
             if (PhoneCommissionClients.TryParse(__state.CustomerId, out _, out _) &&
                 store.currentClientInstance?.storeClient.Pointer != __state.ClientPointer) return;
+
+            try { if (__state.LostCallCapture != null)
+                LostCallClients.Live?.SubmitTradeAfter(__state.LostCallCapture, __state.Amount, Math.Max(0, StoreStation.GetDayCounter())); }
+            catch (Exception ex) { Plugin.Error(ex); }
+
+            try { if (__state.NightOrderCapture != null)
+                NightOrderClients.Live?.SubmitTradeAfter(__state.NightOrderCapture, __state.Amount, Math.Max(0, StoreStation.GetDayCounter())); }
+            catch (Exception ex) { Plugin.Error(ex); }
 
             phone.RecordNativeTrade(__state.Purchase, __state.Uid, __state.ItemId,
                 __state.ItemName, __state.Category, __state.Units, __state.Amount,

@@ -20,6 +20,8 @@ public sealed partial class PhoneBehaviour : MonoBehaviour
     private readonly WorldPhone worldPhone=new();
     private readonly PhoneVisitors visitors=new();
     private readonly PhoneCommissionClients commissionClients=new();
+    private readonly LostCallClients lostCallClients=new();
+    private readonly NightOrderClients nightOrderClients=new();
     private StoreUIManager? lockedUI;
     private string page = "主页", message = "欢迎使用深空手机";
     private PhoneView? view;
@@ -60,6 +62,7 @@ public sealed partial class PhoneBehaviour : MonoBehaviour
         try
         {
             if (!Ready) { Close(); state = null; owner = IntPtr.Zero; ownerRun = ""; prices.Clear(); return; }
+            if(owner!=Store.Pointer||ownerRun!=Store.runID)EnsureState();
             if (Input.GetKeyDown(KeyCode.F6)) Toggle();
             if(visible&&Input.GetKeyDown(KeyCode.Escape)&&!(page=="短视频"&&mediaTab!="station")){if(confirmAction!=null)confirmAction=null;else if(page!="主页")Navigate("主页");else Close();nextDraw=0;}
             if (Time.unscaledTime >= nextCheck)
@@ -68,10 +71,12 @@ public sealed partial class PhoneBehaviour : MonoBehaviour
                 EnsureState();
                 ReplaceWorldPhone();
                 if (state != null && Economy.Settle(state, Day)) WriteState();
-                if(state!=null)visitors.Tick(Store,state.Stories,Activity(),Day,OnVisitorChoice,WriteState,Close);
+                if(state!=null){ObserveFollowup();visitors.Tick(Store,state.Stories,state.Followups,Activity(),Day,OnVisitorChoice,OnFollowupChoice,WriteState,Close,pendingAction==null&&confirmAction==null&&!NativePhoneBusy());}
                 if(state!=null)TickCommissions();
-                if(state!=null && state.PendingSupplier>=0 && !Store.IsClientPresent() && Store.storeState==PlayerStore.StoreState.OPEN)Summon(state.PendingSupplier,state.PendingSupplierFeeCap);
-                if(state?.PendingRecommendation==true && !Store.IsClientPresent() && Store.storeState==PlayerStore.StoreState.OPEN)RecommendCustomer(state.PendingRecommendationFeeCap);
+                if(state!=null)TickLostCall();
+                if(state!=null)TickNightOrders();
+                if(pendingAction==null && confirmAction==null && !NativePhoneBusy() && state!=null && state.PendingSupplier>=0 && !Store.IsClientPresent() && Store.storeState==PlayerStore.StoreState.OPEN)Summon(state.PendingSupplier,state.PendingSupplierFeeCap);
+                if(pendingAction==null && confirmAction==null && !NativePhoneBusy() && state?.PendingRecommendation==true && !Store.IsClientPresent() && Store.storeState==PlayerStore.StoreState.OPEN)RecommendCustomer(state.PendingRecommendationFeeCap);
             }
             var action = pendingAction; pendingAction = null;
             if(action!=null) { Plugin.Instance.Log.LogInfo("Executing phone action on "+page); action.Invoke(); nextDraw=0; }
@@ -105,7 +110,8 @@ public sealed partial class PhoneBehaviour : MonoBehaviour
     {
         var player = Store;
         if (owner == player.Pointer && ownerRun == player.runID) { if(state!=null && Economy.Settle(state,Day))WriteState(); return; }
-        Close(); owner = player.Pointer; ownerRun = player.runID; prices.Clear(); cargo.Clear();nextCargoScan=0;state = null;
+        pendingAction=null;confirmAction=null;showFollowupTask=false;
+        Close(); owner = player.Pointer; ownerRun = player.runID; prices.Clear(); cargo.Clear();nextCargoScan=0;ClearNightStock();state = null;
         if (player.modData == null) player.modData = new Il2CppSystem.Collections.Generic.Dictionary<string,string>();
         try
         {
@@ -138,7 +144,7 @@ public sealed partial class PhoneBehaviour : MonoBehaviour
     }
     public void Close()
     {
-        bool wasVisible=visible;visible=false;pendingAction=null;
+        bool wasVisible=visible;visible=false;pendingAction=null;StopLostCallSignal();
         ReleasePhoneInput(wasVisible);
         view?.Show(false);browser.Hide();confirmAction=null;
         if (mouseLocked) { mouseLocked = false; if (lockedUI != null) lockedUI.DecrementMouseFlag(); lockedUI = null; }
@@ -196,10 +202,13 @@ public sealed partial class PhoneBehaviour : MonoBehaviour
     [HideFromIl2Cpp]
     private void Summon(int kind,int agreedFee=-1)
     {
+        if(!OwnsPhoneRun()||kind is <0 or >3){message="店铺资料已变化，请重新打开手机确认";return;}
+        if(state!.PendingSupplier>=0&&(state.PendingSupplier!=kind||agreedFee!=state.PendingSupplierFeeCap)){message=$"{SupplierLabel(state.PendingSupplier)}预约已变化，请在供应商页重新确认";return;}
         var player = Store;
         if (player.IsClientPresent() || player.lockNextBellFlag > 0 || player.lockAllFlag > 0 || player.storeState!=PlayerStore.StoreState.OPEN)
-        { if(state!=null){state.PendingSupplier=kind;state.PendingSupplierFeeCap=Math.Max(0,agreedFee);WriteState();}message="预约已保存，营业空闲后到访";return; }
-        int serviceFee=SupplierFee();
+        { if(state!=null){state.PendingSupplier=kind;state.PendingSupplierFeeCap=Math.Max(0,agreedFee);WriteState();}message=$"已预约 {SupplierLabel(kind)}，营业空闲后到访";return; }
+        if(state==null||kind is <0 or >3)return;
+        int baseFee=SupplierFee(),serviceFee=SupplierFeeFor(kind);
         if(agreedFee>=0&&serviceFee>agreedFee){message="联络费变化，请重新确认预约";return;}
         if(player.GetCash()<serviceFee){message="联络费不足";return;}
         var client = kind switch {
@@ -209,7 +218,7 @@ public sealed partial class PhoneBehaviour : MonoBehaviour
             _ => StoreClientListSupplier.CreateScavMedSeller()
         };
         contactInFlight=kind;player.storeClientManager.AddNextClient(client);
-        if(state!=null){if(serviceFee>0){ChangeMoney(-serviceFee);Economy.Record(state,Day,"供应商联络费",-serviceFee);}if(state.SupplierCallDay!=Day){state.SupplierCallDay=Day;state.SupplierCallsToday=0;}state.SupplierCallsToday++;state.PendingSupplier=-1;WriteState();}
+        if(state!=null){if(serviceFee>0){ChangeMoney(-serviceFee);Economy.Record(state,Day,"供应商联络费",-serviceFee);}if(state.SupplierCallDay!=Day){state.SupplierCallDay=Day;state.SupplierCallsToday=0;}state.SupplierCallsToday++;RecordSupplierFollowup(kind,baseFee,serviceFee,agreedFee);state.PendingSupplier=-1;WriteState();}
         Plugin.Instance.Log.LogInfo("Supplier queued: "+kind);
         Close(); player.TryCallNextClient();
         if (player.currentClientInstance != null && player.currentClientInstance.storeClient.identifier == client.identifier)
@@ -268,7 +277,7 @@ public sealed partial class PhoneBehaviour : MonoBehaviour
     private void NextVideo(int direction) { videoIndex=Math.Max(0,videoIndex+direction); videoStarted=Time.unscaledTime; }
     public void OnDestroy()
     {
-        Close();DisposePhoneInput(); if(Live==this)Live=null;
+        Close();DisposePhoneInput();DisposeLostCallSignal(); if(Live==this)Live=null;
         view?.Destroy();browser.Dispose();
         worldPhone.Destroy();
         musicRequest?.Abort();musicRequest?.Dispose();

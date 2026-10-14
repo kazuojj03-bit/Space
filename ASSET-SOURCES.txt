@@ -1,0 +1,37 @@
+SpacePhone 3.2 必需Assets来源
+
+共21张外部PNG，PhoneView直接读取，缺文件没有fallback。本源码目录Assets已包含下列确切21张PNG；运行安装包需使用同一组文件。
+
+来源分组：
+device/rounded：pixel_phone_assets.py 用 Image.new/ImageDraw 绘制。
+loan/supplier/stocks/future/lottery/music/video/settings：make_phone_assets.py 基础几何绘图；pixel_phone_assets.py 对同项目生成图调色/像素化。
+stories/contacts/career/cargo/trades/ledger/rain/medic/runner：assets_v2.py 使用几何图形和自画头像。
+dialer/more：assets_v3.py 使用几何图形。
+
+已只读查看四个自有历史脚本，所需Asset生成段不读取原游戏图片。图形来自程序绘制；脚本使用系统字体只制作单独预览图，本安装包不含那些预览或字体。源码创作有广泛AI参与，应作准确AI标签。
+21张已逐字节核对 old ni发布Assets 与当前正式3.1 Assets相同；未重新执行历史绘图脚本，不把该审查称全面法律保证。历史脚本保存在 art_sources 供审查，不要未检查路径就执行。
+
+device.png | 440x850 | SHA256 de9d9094c14d5f87610dc971fbc308084401e66176b9f58cda3f1a1279675e85
+rounded.png | 48x48 | SHA256 0e8175f9fcc9f432a50a6148255d71b94f1c0501a38076215490ba284a1f365e
+stories.png | 96x96 | SHA256 b9dfed74e38370945eea06430018f80dbc56a632c52aee835f692d355177970b
+dialer.png | 96x96 | SHA256 ccb9cb34f7f0f01841c1c8c79c88ffbba211aaca6a56a11ba8f54ffc8e7a6bb5
+supplier.png | 96x96 | SHA256 19bf64625fc2addde55a881929d3ba47ba4b091d24378b6b392857c2ceb9cfa6
+cargo.png | 96x96 | SHA256 09b17c3a2071479418f03b3728134eb683227c2621466941f306cd82cc5b69d6
+stocks.png | 96x96 | SHA256 7677a0577595a35f0eec79a8c2acc8a4969c876d0cdb66b36727b9fb0bd0e143
+more.png | 96x96 | SHA256 d5349e899cf234e1fb08fb1654297eba449d04f1f504e24e7abc8dd828b7ab5d
+loan.png | 96x96 | SHA256 a7965af4b7525d3c71277ffa7ae4093765320cbeabac4d044f1a4b8c4ded80b8
+future.png | 96x96 | SHA256 cdc43d826ff4ba8f64a0391cc2f24e50c813dea427b8da514087eda28e4f252a
+contacts.png | 96x96 | SHA256 a116260c27e2e525d6b3bc365aa3f7281707bdf63499dd323d8388faa6fa11e0
+career.png | 96x96 | SHA256 09e1eb5b7448d3b8936f9c6102e84f40f2846dabdf65c8952b1796520204b239
+trades.png | 96x96 | SHA256 f0ed9484679e52e9b4b4335a30564c1c30fc3b9176ee1966ff25ee66b28483aa
+ledger.png | 96x96 | SHA256 1955ed33ccbc42a92c48f2c61a2dd64b7badb6474b66887d483b7e7e6b206acb
+lottery.png | 96x96 | SHA256 25c21e80d9032313b11e45bee7f338325d7b064f3e7becd638a6581b1dba1959
+music.png | 96x96 | SHA256 884374760eda29b03b200b5f9caabfa6aff932fb32b6560b5cd4fb6ac7a57daa
+video.png | 96x96 | SHA256 c496355e284d17415036c37aa2a366aa86d4efc9e4cd547041b21c8f7fa268fa
+settings.png | 96x96 | SHA256 63d6f87d06b33a0d5b227ffb4c15621e92ecb266097fd588e7167419820d3391
+rain.png | 96x96 | SHA256 0a2e7043de79318160ee0afc7908079fd7d24d000dfd45722490b5e74e506e42
+medic.png | 96x96 | SHA256 07ef75e49154d6305b8791a995fc1f8e4bcd28955bd7892e8fe79706046a7ab4
+runner.png | 96x96 | SHA256 160118956772a40d052d1176faabc1fae867b2ea9be386af941fd5be312403aa
+
+不需要的旧PNG：phone.png、world-phone.png（当前加载路径无调用）；不进入新包。
+余灯/夜班人物/录音匣/三维手机由当前自有C#程序生成，无新增独立PNG/网格外部文件；不把概念图当作游戏内发行素材。

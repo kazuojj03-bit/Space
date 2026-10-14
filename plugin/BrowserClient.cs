@@ -52,12 +52,13 @@ internal sealed class BrowserClient:IDisposable
         if(running && process!=null && !process.HasExited)return;
         string executable=Path.Combine(BepInEx.Paths.PluginPath,"SpacePhone","BrowserHost","SpacePhone.WebViewHost.exe");
         if(!File.Exists(executable))throw new FileNotFoundException("网页组件未安装",executable);
+        string? isolatedRoot=BrowserIsolationRoot();
         string pipeName="SpacePhone-"+Environment.ProcessId+"-"+Guid.NewGuid().ToString("N");
         pipe?.Dispose();process?.Dispose();
         var sessionPipe=new NamedPipeServerStream(pipeName,PipeDirection.InOut,1,PipeTransmissionMode.Byte,PipeOptions.Asynchronous|PipeOptions.CurrentUserOnly);pipe=sessionPipe;
         var start=new ProcessStartInfo(executable){UseShellExecute=false,CreateNoWindow=true,WindowStyle=ProcessWindowStyle.Hidden,WorkingDirectory=Path.GetDirectoryName(executable)!};
         start.ArgumentList.Add("--pipe");start.ArgumentList.Add(pipeName);
-        // Public source: local clone-specific test profile/capture launch arguments omitted.
+        if(isolatedRoot!=null){start.ArgumentList.Add("--profile");start.ArgumentList.Add(Path.Combine(isolatedRoot,"browser-test-profile"));start.ArgumentList.Add("--test-capture-dir");start.ArgumentList.Add(isolatedRoot);}
         // Browser owns normal site sessions. No account/token/password is copied into game saves.
         var sessionProcess=Process.Start(start)??throw new InvalidOperationException("无法启动网页组件");process=sessionProcess;running=true;
         _=Task.Run(async()=>
@@ -73,6 +74,41 @@ internal sealed class BrowserClient:IDisposable
             catch(Exception ex){if(!stop.IsCancellationRequested)replies.Enqueue(new Reply("host_error","网页组件："+ex.Message));}
             finally{if(ReferenceEquals(process,sessionProcess))running=false;}
         });
+    }
+    private static string? BrowserIsolationRoot()
+    {
+        string actual=Path.GetFullPath(BepInEx.Paths.GameRootPath).TrimEnd(Path.DirectorySeparatorChar,Path.AltDirectorySeparatorChar);
+        string marker=Path.Combine(actual,".spacephone-test-clone");
+        string? requested=Environment.GetEnvironmentVariable("SPACEPHONE_TEST_ROOT");
+        bool tester=File.Exists(Path.Combine(BepInEx.Paths.PluginPath,"SpacePhone","SpacePhone.IntegrationTests.dll")) ||
+            AppDomain.CurrentDomain.GetAssemblies().Any(a=>a.GetName().Name=="SpacePhone.IntegrationTests");
+        bool marked=File.Exists(marker);
+        if(string.IsNullOrWhiteSpace(requested))
+        {
+            if(marked||tester)throw new InvalidOperationException("测试副本未指定隔离网页目录，已阻止网页组件启动；账号资料未读取");
+            return null;
+        }
+        string expected=Path.GetFullPath(requested).TrimEnd(Path.DirectorySeparatorChar,Path.AltDirectorySeparatorChar);
+        if(!string.Equals(actual,expected,StringComparison.OrdinalIgnoreCase)||!marked)
+            throw new InvalidOperationException("网页测试隔离目录不匹配，已阻止启动");
+        BrowserNoReparse(actual);BrowserNoReparse(marker);
+        using var parsed=JsonDocument.Parse(File.ReadAllText(marker));var m=parsed.RootElement;
+        string recorded=Path.GetFullPath(m.GetProperty("cloneRoot").GetString()??"").TrimEnd(Path.DirectorySeparatorChar,Path.AltDirectorySeparatorChar);
+        if(m.GetProperty("schemaVersion").GetInt32()!=1 || m.GetProperty("purpose").GetString()!="spacephone-no-save-tests" ||
+            m.GetProperty("allowSave").GetBoolean() || !string.Equals(recorded,actual,StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("网页测试标记无效，已阻止启动");
+        BrowserNoReparse(Path.Combine(actual,"browser-test-profile"));
+        return actual;
+    }
+    private static void BrowserNoReparse(string target)
+    {
+        string p=Path.GetFullPath(target);
+        while(!string.IsNullOrEmpty(p))
+        {
+            if((File.Exists(p)||Directory.Exists(p)) && (File.GetAttributes(p)&FileAttributes.ReparsePoint)!=0)
+                throw new InvalidOperationException("网页测试路径不能包含重定向目录");
+            string? parent=Path.GetDirectoryName(p);if(parent==p)break;p=parent??"";
+        }
     }
     public void Dispose(){Send("close");stop.Cancel();pipe?.Dispose();stop.Dispose();process?.Dispose();}
 }

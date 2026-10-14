@@ -1,0 +1,264 @@
+{
+  "schemaVersion": 1,
+  "version": "3.2.0-rc1",
+  "pluginDeclaredVersion": "3.2.0",
+  "status": "COMPILED_PREVIEW_FINAL_NATIVE_TESTS_NOT_COMPLETED",
+  "sourceFileCount": 35,
+  "files": [
+    {
+      "source": "plugin/AssemblyInfo.cs",
+      "sha256": "31b3a13bf66c2b4c4ccb0c8d3261b95356a39047d89abe5775bb1df0694a28a2"
+    },
+    {
+      "source": "plugin/BrowserClient.cs",
+      "sha256": "e50539fdb84de37e502672e1ba2ad3ef75a4901277062c96785695b35d587b75"
+    },
+    {
+      "source": "plugin/Business.cs",
+      "sha256": "58cbbed2549d8ba24bb46f75a2aeb538d6dce00ae28c47632a5b4e681fb566bf"
+    },
+    {
+      "source": "plugin/CommissionRules.cs",
+      "sha256": "aecd2bb016aab1b1383e9efba37d248a3538b8beaf9047066c964cf73663e2da"
+    },
+    {
+      "source": "plugin/Economy.cs",
+      "sha256": "c35927287ca6eba8d4b35fc03453097b5e7a6b2ed1e84428e22686e964d78b61"
+    },
+    {
+      "source": "plugin/FollowupRules.cs",
+      "sha256": "3dd308b2e7edae969d139f181ef65e4387b9dc29e680044a17545e828743eafa"
+    },
+    {
+      "source": "plugin/LostCallClients.cs",
+      "sha256": "1b26ed5b002b3222707bf077dc66617d22ec2dbb3b3c85d31ca5fb3a0b969b51"
+    },
+    {
+      "source": "plugin/LostCallConversation.cs",
+      "sha256": "0390e2575c374c30e0f91045b425bcaf5954b2323b9bf3859d10745e13cde4ed"
+    },
+    {
+      "source": "plugin/LostCallItemDefinition.cs",
+      "sha256": "4ad6c7d034c754ef7fc78d9913d88de34ac58211234432480c98dbb0143e6c27"
+    },
+    {
+      "source": "plugin/LostCallRules.cs",
+      "sha256": "17980bb9ece7dcbb402822bb0ae5763f6bd170a19f0d01e3b1532cbe462dad64"
+    },
+    {
+      "source": "plugin/NativePointer.cs",
+      "sha256": "9ffd1ddf4c68a0784b1d7a2c9298bb230b71af11566ef17f66dbd14d6be98c0b"
+    },
+    {
+      "source": "plugin/NightOrderClients.cs",
+      "sha256": "4fa4433535bfae455f1fbf7d8332be0681ea7d7236bdce576ab6c7e19613d1b4"
+    },
+    {
+      "source": "plugin/NightOrderConversation.cs",
+      "sha256": "f801a94bdafe72641077c3e15a85d1b7dc05ff90e57cb8e98e0d8f5ab333ecf9"
+    },
+    {
+      "source": "plugin/NightOrderRules.cs",
+      "sha256": "2f173feb3a7e36412ff642cb1763c267ba18043c7ce286ef6c65bf480e1034d0"
+    },
+    {
+      "source": "plugin/PhoneBehaviour.cs",
+      "sha256": "ed4a025dd7d5906750273eca6daeb1ee137db36b14bbcb1112869cb6408060c4"
+    },
+    {
+      "source": "plugin/PhoneBusiness.cs",
+      "sha256": "368e07365fcb5fc2cf5a747d057eb19e0115299dd1ff06200b5d0a3f0a6271fb"
+    },
+    {
+      "source": "plugin/PhoneCommissionClients.cs",
+      "sha256": "4997f27f76eec3813b1cfcc5bb27306b3ae9d7d88dc051fbbe86eef584a43b9d"
+    },
+    {
+      "source": "plugin/PhoneCommissions.cs",
+      "sha256": "88f739d1eaee1f7dfe81a6be8bda0c352e99924e898ebdc7d51a15d09552d43d"
+    },
+    {
+      "source": "plugin/PhoneFollowups.cs",
+      "sha256": "7304e72e730f4303f28fe7ce8dfa9f3477b60cfb124adcb95c4183fc6fcae827"
+    },
+    {
+      "source": "plugin/PhoneInput.cs",
+      "sha256": "373fe06978297962832385854d14e04057f128618f2c393875bd3de04c6d5272"
+    },
+    {
+      "source": "plugin/PhoneLostCall.cs",
+      "sha256": "3fb5a0b616267c75cdc18f65f196699676fa679aa3f17d97f65cc693ae779d09"
+    },
+    {
+      "source": "plugin/PhoneLostCallAudio.cs",
+      "sha256": "bd3f1d16ba8d4cc63cbfed1641ec0d1dbc0bc89f9033f78d5683e13a2c325cc4"
+    },
+    {
+      "source": "plugin/PhoneMissions.cs",
+      "sha256": "1f7537fd924c93cbeef2be8f6ba6ce03df4727db012736103bc0a948b5cc6b3e"
+    },
+    {
+      "source": "plugin/PhoneNightOrders.cs",
+      "sha256": "64ef89feec93f0fff5362468c9859a259b43d55db02ffbae13ed11b437ca87d1"
+    },
+    {
+      "source": "plugin/PhoneNightStock.cs",
+      "sha256": "765c913fcf3a17944343502aeb9fd245c3f0ebfbdeabe39ff4de7c3cb1d1bb9f"
+    },
+    {
+      "source": "plugin/PhoneScreens.cs",
+      "sha256": "b281213a899bcb757e1a1f1a1ef96ba0e5390f6da85752e3c17218fad740a09e"
+    },
+    {
+      "source": "plugin/PhoneStories.cs",
+      "sha256": "a368a72380176272675e6e24af3e865af975d8c35a0d6456ce7bb5e5897fa2fb"
+    },
+    {
+      "source": "plugin/PhoneView.cs",
+      "sha256": "613abf91a346f1dc817cf0e727817e45d186d391b4b9124ddb911c4407e13e82"
+    },
+    {
+      "source": "plugin/PhoneVisitors.cs",
+      "sha256": "d9ff661080810e27367b49b0ea6c3a4ff1f1b756ff7329daf21be09abc50db73"
+    },
+    {
+      "source": "plugin/Plugin.cs",
+      "sha256": "03ca8d60bbc9e5272cde8df4bee3f408e0ec542d548453d1aa96e794115f141a"
+    },
+    {
+      "source": "plugin/SpacePhone.csproj",
+      "sha256": "6a80d8bca7ca13518453f2a6a1b3ad1e212d5be301afbd754654ecffc834e6e3"
+    },
+    {
+      "source": "plugin/StockIdentityHooks.cs",
+      "sha256": "7526b126a618edba29f2f9de3d8bb9ab56d60ead01ea449fc57680d69bd29454"
+    },
+    {
+      "source": "plugin/TaskGuide.cs",
+      "sha256": "5c66d718626cd2194b2519b8942d22a32667b3789912e6387be2058a34715526"
+    },
+    {
+      "source": "plugin/TradeHooks.cs",
+      "sha256": "0fba70ee9d712d1ba5264275bb2087f7cc2b87cff656f25fb2620595c0e20652"
+    },
+    {
+      "source": "plugin/WorldPhone.cs",
+      "sha256": "6e11c988cd2f8ffb1308306be059856667e0302a47f1934aab12f8a83d809f3a"
+    }
+  ],
+  "candidateDllSha256": "4bb0b5c07f3bfa8e3d96d84a16f91189765b9999cf4fec995dea74be08d821de",
+  "sourceByteCorrespondenceVerified": true,
+  "binaryIncluded": false,
+  "publicBranchUrl": "https://github.com/kazuojj03-bit/Space/tree/codex/spacephone-3-2",
+  "immutableCommitNote": "The uploader package links to the exact commit containing these files.",
+  "assets": [
+    {
+      "source": "Assets/device.png",
+      "sha256": "de9d9094c14d5f87610dc971fbc308084401e66176b9f58cda3f1a1279675e85",
+      "size": 4397
+    },
+    {
+      "source": "Assets/rounded.png",
+      "sha256": "0e8175f9fcc9f432a50a6148255d71b94f1c0501a38076215490ba284a1f365e",
+      "size": 158
+    },
+    {
+      "source": "Assets/stories.png",
+      "sha256": "b9dfed74e38370945eea06430018f80dbc56a632c52aee835f692d355177970b",
+      "size": 414
+    },
+    {
+      "source": "Assets/dialer.png",
+      "sha256": "ccb9cb34f7f0f01841c1c8c79c88ffbba211aaca6a56a11ba8f54ffc8e7a6bb5",
+      "size": 445
+    },
+    {
+      "source": "Assets/supplier.png",
+      "sha256": "19bf64625fc2addde55a881929d3ba47ba4b091d24378b6b392857c2ceb9cfa6",
+      "size": 499
+    },
+    {
+      "source": "Assets/cargo.png",
+      "sha256": "09b17c3a2071479418f03b3728134eb683227c2621466941f306cd82cc5b69d6",
+      "size": 416
+    },
+    {
+      "source": "Assets/stocks.png",
+      "sha256": "7677a0577595a35f0eec79a8c2acc8a4969c876d0cdb66b36727b9fb0bd0e143",
+      "size": 519
+    },
+    {
+      "source": "Assets/more.png",
+      "sha256": "d5349e899cf234e1fb08fb1654297eba449d04f1f504e24e7abc8dd828b7ab5d",
+      "size": 369
+    },
+    {
+      "source": "Assets/loan.png",
+      "sha256": "a7965af4b7525d3c71277ffa7ae4093765320cbeabac4d044f1a4b8c4ded80b8",
+      "size": 484
+    },
+    {
+      "source": "Assets/future.png",
+      "sha256": "cdc43d826ff4ba8f64a0391cc2f24e50c813dea427b8da514087eda28e4f252a",
+      "size": 544
+    },
+    {
+      "source": "Assets/contacts.png",
+      "sha256": "a116260c27e2e525d6b3bc365aa3f7281707bdf63499dd323d8388faa6fa11e0",
+      "size": 377
+    },
+    {
+      "source": "Assets/career.png",
+      "sha256": "09e1eb5b7448d3b8936f9c6102e84f40f2846dabdf65c8952b1796520204b239",
+      "size": 407
+    },
+    {
+      "source": "Assets/trades.png",
+      "sha256": "f0ed9484679e52e9b4b4335a30564c1c30fc3b9176ee1966ff25ee66b28483aa",
+      "size": 432
+    },
+    {
+      "source": "Assets/ledger.png",
+      "sha256": "1955ed33ccbc42a92c48f2c61a2dd64b7badb6474b66887d483b7e7e6b206acb",
+      "size": 422
+    },
+    {
+      "source": "Assets/lottery.png",
+      "sha256": "25c21e80d9032313b11e45bee7f338325d7b064f3e7becd638a6581b1dba1959",
+      "size": 503
+    },
+    {
+      "source": "Assets/music.png",
+      "sha256": "884374760eda29b03b200b5f9caabfa6aff932fb32b6560b5cd4fb6ac7a57daa",
+      "size": 497
+    },
+    {
+      "source": "Assets/video.png",
+      "sha256": "c496355e284d17415036c37aa2a366aa86d4efc9e4cd547041b21c8f7fa268fa",
+      "size": 515
+    },
+    {
+      "source": "Assets/settings.png",
+      "sha256": "63d6f87d06b33a0d5b227ffb4c15621e92ecb266097fd588e7167419820d3391",
+      "size": 557
+    },
+    {
+      "source": "Assets/rain.png",
+      "sha256": "0a2e7043de79318160ee0afc7908079fd7d24d000dfd45722490b5e74e506e42",
+      "size": 487
+    },
+    {
+      "source": "Assets/medic.png",
+      "sha256": "07ef75e49154d6305b8791a995fc1f8e4bcd28955bd7892e8fe79706046a7ab4",
+      "size": 511
+    },
+    {
+      "source": "Assets/runner.png",
+      "sha256": "160118956772a40d052d1176faabc1fae867b2ea9be386af941fd5be312403aa",
+      "size": 490
+    }
+  ],
+  "nativeValidated": false,
+  "noByteIdenticalRebuildClaim": true,
+  "noNexusClearanceClaim": true
+}

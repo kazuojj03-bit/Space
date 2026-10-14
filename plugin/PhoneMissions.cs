@@ -4,6 +4,9 @@ namespace SpacePhone;
 public sealed partial class PhoneBehaviour
 {
     private bool taskListMode;
+    [HideFromIl2Cpp] private bool NativePhoneBusy() => PhoneUIManager.Instance?.phonePanel?.activeSelf == true ||
+        PhoneUIManager.Instance?.isCalling == true || PhoneUIManager.Instance?.isTalking == true ||
+        DialoguePhoneUIManager.Instance?.isConversationActiveFlag > 0;
     [HideFromIl2Cpp] private void OpenOriginalDialer()
     {
         var original=PhoneUIManager.Instance;
@@ -12,6 +15,8 @@ public sealed partial class PhoneBehaviour
     }
     [HideFromIl2Cpp] private void InviteStoryVisitor(int index,int scene)
     {
+        if(NightOrderHasPending()){message="夜班买家已有到访安排，先完成或取消它";return;}
+        if(LostCallHasPending()){message="余灯已有来店安排，先完成或取消它";return;}
         if(state!.Commissions.Entries.Any(c=>c.QueuedStage>=0)){message="已有实物委托到访预约，先完成或取消它";return;}
         state!.ActiveStory=index;taskListMode=false;
         message=PhoneVisitors.QueueVisit(state.Stories,index,scene,Day,Activity());WriteState();
@@ -58,13 +63,15 @@ public sealed partial class PhoneBehaviour
             string[] portraits={"rain","medic","runner"};
             for(int i=0;i<3;i++)
             {
-                int selected=i;var guide=TaskGuide.Build(state!.Stories,i,Day,Activity(),B.ResearchPoints);float y=230+i*138;
-                Surface(36,y,368,122,"task:"+i,()=>{state.ActiveStory=selected;taskListMode=false;WriteState();});
-                view!.Icon(48,y+18,58,portraits[i],()=>{if(pendingAction==null)pendingAction=()=>{state.ActiveStory=selected;taskListMode=false;WriteState();};});
-                Label(120,y+13,266,31,StoryRules.GetTitle(i),true);Small(120,y+51,267,guide.Step);Label(120,y+79,267,32,guide.Progress);
+                int selected=i;var guide=TaskGuide.Build(state!.Stories,i,Day,Activity(),B.ResearchPoints);float y=230+i*108;
+                Surface(36,y,368,96,"task:"+i,()=>{state.ActiveStory=selected;taskListMode=false;showFollowupTask=selected==2&&PreferFollowup();WriteState();});
+                view!.Icon(48,y+17,48,portraits[i],()=>{if(pendingAction==null)pendingAction=()=>{state.ActiveStory=selected;taskListMode=false;showFollowupTask=selected==2&&PreferFollowup();WriteState();};});
+                Label(110,y+8,276,29,StoryRules.GetTitle(i),true);Small(110,y+41,277,guide.Step);Small(110,y+66,277,guide.Progress);
             }
-            Small(42,657,350,"交易照常议价；所有路线在接取后开始计数");return;
+            DrawLostCallListCard(554);
+            Small(42,667,350,"当面认识、正常议价 · 新来电没有期限");return;
         }
+        if(index==2&&showFollowupTask){DrawFollowupTask();return;}
         var card=TaskGuide.Build(state!.Stories,index,Day,Activity(),B.ResearchPoints);var thread=state.Stories.Threads[index];
         Label(42,188,142,37,card.Heading,true);Btn(189,187,105,34,"实物委托",()=>OpenCommissions(index));Btn(304,187,100,34,"伙伴列表",()=>taskListMode=true);
         view!.Card(36,236,368,112,"当前步骤",card.Step,card.Progress,Gold);
@@ -72,6 +79,7 @@ public sealed partial class PhoneBehaviour
         Btn(36,529,368,43,card.PrimaryLabel,()=>RunGuideAction(index,card));
         Btn(36,585,179,36,"联系供应商",()=>Navigate("供应商"));Btn(225,585,179,36,"查看货柜",()=>Navigate("货柜"));
         if(thread.QueuedVisitScene>=0)Btn(36,636,368,35,"取消到访预约",()=>{message=PhoneVisitors.CancelVisit(state.Stories,index);WriteState();});
+        else if(index==2&&FollowupVisible())Btn(36,636,179,35,"货路回访",OpenFollowupTask);
         else if(thread.Phase>0&&thread.LastVisitDay!=Day)Btn(36,636,179,35,"当面问问",()=>InviteStoryVisitor(index,3));
         if(thread.QueuedVisitScene<0)Btn(225,636,179,35,"查看来信",()=>{selectedStory=index;NavigateLetter();});
     }
